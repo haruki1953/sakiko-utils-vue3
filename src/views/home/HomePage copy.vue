@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
 import type { UploadUserFile } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
 
 interface ImageData {
   url: string
@@ -176,40 +175,62 @@ const couldShowMergeBtn = computed(() => {
 
 <template>
   <div class="utils-page">
-    <h2>字幕拼接小工具🖨</h2>
+    <h2>字幕拼接</h2>
     <div>
+      <div>
+        <el-text tag="b" size="large"> 字幕截取高度（百分比） </el-text>
+        <el-slider v-model="cropHeightPercent" :min="0" :max="100" />
+      </div>
       <div class="upload">
         <el-upload
           multiple
           :auto-upload="false"
           accept="image/*"
           v-model:file-list="upFiles"
-          list-type="picture-card"
+          list-type="picture"
         >
-          <el-icon class="uploader-icon"><Plus /></el-icon>
-          <span class="uploader-text">添加图片</span>
+          <div>
+            <div class="btn-box hidden-xs-only">
+              <el-button type="primary"> 上传图片 </el-button>
+              <el-button @click.stop="clearImages" v-show="couldShowClearBtn">
+                清空
+              </el-button>
+              <el-divider direction="vertical" />
+              <el-button
+                type="primary"
+                @click.stop="mergeImages"
+                :loading="isMerging"
+                v-show="couldShowMergeBtn"
+              >
+                生成
+              </el-button>
+              <template v-if="mergedImage">
+                <el-button @click.stop="copyImage"> 复制 </el-button>
+                <el-button @click.stop="saveImage"> 保存 </el-button>
+              </template>
+            </div>
+            <div class="btn-box hidden-sm-and-up">
+              <el-button type="primary"> 上传图片 </el-button>
+              <el-button @click.stop="clearImages" v-show="couldShowClearBtn">
+                清空
+              </el-button>
+            </div>
+            <div class="btn-box hidden-sm-and-up">
+              <el-button
+                type="primary"
+                @click.stop="mergeImages"
+                :loading="isMerging"
+                v-show="couldShowMergeBtn"
+              >
+                生成
+              </el-button>
+              <template v-if="mergedImage">
+                <el-button @click.stop="copyImage"> 复制 </el-button>
+                <el-button @click.stop="saveImage"> 保存 </el-button>
+              </template>
+            </div>
+          </div>
         </el-upload>
-      </div>
-      <div>
-        <el-text tag="b" size="large"> 字幕截取高度（百分比） </el-text>
-        <el-slider v-model="cropHeightPercent" :min="0" :max="100" />
-      </div>
-      <div class="btn-box">
-        <el-button
-          type="warning"
-          @click="mergeImages"
-          :loading="isMerging"
-          v-if="couldShowMergeBtn"
-        >
-          生成
-        </el-button>
-        <template v-if="mergedImage">
-          <el-button type="info" @click="copyImage"> 复制 </el-button>
-          <el-button type="success" @click="saveImage"> 保存 </el-button>
-        </template>
-        <el-button type="danger" @click="clearImages" v-if="couldShowClearBtn">
-          清空
-        </el-button>
       </div>
       <div v-if="mergedImage">
         <el-image class="merged-image" :src="mergedImage" />
@@ -221,8 +242,9 @@ const couldShowMergeBtn = computed(() => {
 
 <style lang="scss" scoped>
 .utils-page {
-  max-width: 1024px;
+  max-width: 920px;
   margin: 0 auto;
+  padding-bottom: 20px;
   font-family: Arial, sans-serif;
   line-height: 1.6;
   font-size: 16px;
@@ -236,42 +258,8 @@ const couldShowMergeBtn = computed(() => {
 }
 .upload {
   :deep() {
-    .el-upload-list {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-content: center;
-      .el-upload-list__item {
-        width: 240px;
-        height: 135px;
-        display: flex;
-        margin: 8px;
-      }
-    }
     .el-upload {
-      width: 240px;
-      height: 135px;
-      margin: 8px;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      border: 2px dashed var(--el-border-color);
-      border-radius: 6px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: var(--el-transition-duration);
-      color: #8c939d;
-      &:hover {
-        border-color: var(--el-color-primary);
-      }
-      .uploader-icon {
-        font-size: 28px;
-      }
-      .uploader-text {
-        font-weight: bold;
-        margin-left: 8px;
-      }
     }
     .el-upload-list__item-thumbnail {
       background-color: var(--el-fill-color-blank);
