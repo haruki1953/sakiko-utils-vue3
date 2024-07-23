@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
-import type { UploadFile, UploadUserFile } from 'element-plus'
-import { Plus, Back, Right, Delete } from '@element-plus/icons-vue'
+import type { UploadUserFile } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 interface ImageData {
   url: string
@@ -9,6 +9,7 @@ interface ImageData {
   width: number
 }
 
+const images = ref<ImageData[]>([])
 const upFiles = ref<UploadUserFile[]>([])
 const mergedImage = ref<string | null>(null)
 const cropHeightPercent = ref<number>(15)
@@ -35,12 +36,13 @@ const handlePicFile = (file: File): Promise<ImageData> => {
 }
 
 const handleFiles = async (uploadFiles: UploadUserFile[]) => {
+  console.log(images)
   const tempImages: ImageData[] = []
   for (const file of uploadFiles) {
     const imageData = await handlePicFile(file.raw as File)
     tempImages.push(imageData)
   }
-  return tempImages
+  images.value = tempImages
 }
 
 const mergeImages = async () => {
@@ -50,10 +52,10 @@ const mergeImages = async () => {
   }
   isMerging.value = true
   try {
-    const imageList = await handleFiles(upFiles.value)
+    await handleFiles(upFiles.value)
 
     const baseImage = new Image()
-    baseImage.src = imageList[0].url
+    baseImage.src = images.value[0].url
     await new Promise((resolve) => {
       baseImage.onload = resolve
     })
@@ -65,16 +67,16 @@ const mergeImages = async () => {
     // Set canvas width to the width of the first image
     canvas.width = baseImage.width
     // Set canvas height to the height of the first image plus the cropped heights of all subsequent images
-    canvas.height = baseImage.height + cropHeight * (imageList.length - 1)
+    canvas.height = baseImage.height + cropHeight * (images.value.length - 1)
 
     // Draw the first image in its entirety
     context.drawImage(baseImage, 0, 0)
 
     // Draw each subsequent image cropped from the bottom
     let currentHeight = baseImage.height
-    for (let i = 1; i < imageList.length; i++) {
+    for (let i = 1; i < images.value.length; i++) {
       const img = new Image()
-      img.src = imageList[i].url
+      img.src = images.value[i].url
       await new Promise((resolve) => {
         img.onload = resolve
       })
@@ -105,6 +107,7 @@ const mergeImages = async () => {
 }
 
 const clearImages = () => {
+  images.value = []
   upFiles.value = []
   mergedImage.value = null
 }
@@ -154,7 +157,11 @@ const messageError = (message: string) => {
 }
 
 const couldShowClearBtn = computed(() => {
-  if (upFiles.value.length === 0 && mergedImage.value === null) {
+  if (
+    images.value.length === 0 &&
+    upFiles.value.length === 0 &&
+    mergedImage.value === null
+  ) {
     return false
   }
   return true
@@ -165,49 +172,6 @@ const couldShowMergeBtn = computed(() => {
   }
   return true
 })
-
-const couldFileMove = (file: UploadFile, move: 'left' | 'right') => {
-  // 找到文件在数组中的位置
-  const index = upFiles.value.indexOf(file)
-  if (index !== -1) {
-    if (move === 'left' && index > 0) {
-      return true
-    } else if (move === 'right' && index < upFiles.value.length - 1) {
-      return true
-    }
-  }
-  return false
-}
-const handleFileMove = async (file: UploadFile, move: 'left' | 'right') => {
-  // 找到文件在数组中的位置
-  const index = upFiles.value.indexOf(file)
-
-  // 如果文件在数组中
-  if (index !== -1) {
-    const delAndwait = async () => {
-      // 从数组中删除文件并保存
-      const removedFile = upFiles.value.splice(index, 1)[0]
-      await new Promise((resolve) => setTimeout(resolve, 400)) // 等动画生效
-      return removedFile
-    }
-    // 如果向左移动
-    if (move === 'left' && index > 0) {
-      const removedFile = await delAndwait()
-      // 在左边插入文件
-      upFiles.value.splice(index - 1, 0, removedFile)
-    }
-    // 如果向右移动
-    else if (move === 'right' && index < upFiles.value.length - 1) {
-      const removedFile = await delAndwait()
-      // 在右边插入文件
-      upFiles.value.splice(index + 1, 0, removedFile)
-    }
-  }
-}
-
-const handleFileRemove = (file: UploadFile) => {
-  upFiles.value = upFiles.value.filter((item) => item.uid !== file.uid)
-}
 </script>
 
 <template>
@@ -224,37 +188,6 @@ const handleFileRemove = (file: UploadFile) => {
         >
           <el-icon class="uploader-icon"><Plus /></el-icon>
           <span class="uploader-text">添加图片</span>
-          <template #file="{ file }">
-            <div>
-              <img
-                class="el-upload-list__item-thumbnail"
-                :src="file.url"
-                :alt="file.name"
-              />
-              <span class="el-upload-list__item-actions">
-                <span
-                  class="el-upload-list__item-preview"
-                  @click="handleFileMove(file, 'left')"
-                  v-if="couldFileMove(file, 'left')"
-                >
-                  <el-icon><Back /></el-icon>
-                </span>
-                <span
-                  class="el-upload-list__item-delete"
-                  @click="handleFileRemove(file)"
-                >
-                  <el-icon><Delete /></el-icon>
-                </span>
-                <span
-                  class="el-upload-list__item-delete"
-                  @click="handleFileMove(file, 'right')"
-                  v-if="couldFileMove(file, 'right')"
-                >
-                  <el-icon><Right /></el-icon>
-                </span>
-              </span>
-            </div>
-          </template>
         </el-upload>
       </div>
       <div>
@@ -307,7 +240,6 @@ const handleFileRemove = (file: UploadFile) => {
   }
 }
 $upload-img-width: 240px;
-$upload-img-max-width: 300px;
 $upload-img-height: 135px;
 .upload {
   :deep() {
@@ -317,8 +249,7 @@ $upload-img-height: 135px;
       justify-content: center;
       align-content: center;
       .el-upload-list__item {
-        width: auto;
-        max-width: $upload-img-max-width;
+        width: $upload-img-width;
         height: $upload-img-height;
         display: flex;
         margin: 8px;
