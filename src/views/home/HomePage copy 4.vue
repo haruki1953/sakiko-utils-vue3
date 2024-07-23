@@ -5,33 +5,8 @@ import { Plus, Back, Right, Delete } from '@element-plus/icons-vue'
 
 const upFiles = ref<UploadUserFile[]>([])
 const mergedImage = ref<string | null>(null)
+const cropHeightPercent = ref<number>(15)
 const isMerging = ref(false)
-const cropRangePercent = ref<[number, number]>([0, 15])
-const sliderRange = ref({ min: 0, max: 30 })
-const dontCropFirstSub = ref(false)
-
-const calcCropRangePercent = () => {
-  const [minValue, maxValue] = cropRangePercent.value
-  return {
-    max: Math.max(minValue, maxValue),
-    min: Math.min(minValue, maxValue),
-    difference: Math.abs(maxValue - minValue)
-  }
-}
-const changeSliderRange = () => {
-  let { min, max } = calcCropRangePercent()
-  if (max >= 30) {
-    max = 100
-  } else {
-    max = 30
-  }
-  if (min <= 70) {
-    min = 0
-  } else {
-    min = 70
-  }
-  sliderRange.value = { min, max }
-}
 
 const handlePicFiles = async (
   uploadFiles: UploadUserFile[]
@@ -57,17 +32,7 @@ const mergeImages = async () => {
   try {
     const imageList = await handlePicFiles(upFiles.value)
     const baseImage = imageList[0]
-
-    // 字幕拼接高度
-    const cropHeight =
-      baseImage.height * (calcCropRangePercent().difference / 100)
-    // 字幕上边
-    const cropMax = baseImage.height * (calcCropRangePercent().max / 100)
-    // 字幕下边
-    const cropMin = baseImage.height * (calcCropRangePercent().min / 100)
-
-    const startHeight =
-      baseImage.height - (dontCropFirstSub.value ? cropMax : cropMin)
+    const cropHeight = baseImage.height * (cropHeightPercent.value / 100)
 
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d') as CanvasRenderingContext2D
@@ -75,35 +40,25 @@ const mergeImages = async () => {
     // Set canvas width to the width of the first image
     canvas.width = baseImage.width
     // Set canvas height to the height of the first image plus the cropped heights of all subsequent images
-    canvas.height = startHeight + cropHeight * (imageList.length - 1)
+    canvas.height = baseImage.height + cropHeight * (imageList.length - 1)
 
-    // Draw the first image
-    context.drawImage(
-      baseImage,
-      0,
-      0,
-      baseImage.width,
-      startHeight,
-      0,
-      0,
-      baseImage.width,
-      startHeight
-    )
+    // Draw the first image in its entirety
+    context.drawImage(baseImage, 0, 0)
 
     // Draw each subsequent image cropped from the bottom
-    let currentHeight = startHeight
+    let currentHeight = baseImage.height
 
     imageList.slice(1).forEach((img) => {
       context.drawImage(
         img,
         0,
-        img.height - cropMax - 1,
+        img.height - cropHeight,
         img.width,
-        cropHeight + 1,
+        cropHeight,
         0,
-        currentHeight - 1,
+        currentHeight,
         img.width,
-        cropHeight + 1
+        cropHeight
       )
       currentHeight += cropHeight
     })
@@ -272,24 +227,12 @@ const handleFileRemove = (file: UploadFile) => {
         </el-upload>
       </div>
       <div>
-        <div class="crop-height-slider-lable">
-          <span> 字幕截取高度 </span>
-          <el-checkbox v-model="dontCropFirstSub" label="不拼接首个字幕" />
-        </div>
+        <el-text tag="b" size="large"> 字幕截取高度（百分比） </el-text>
         <el-slider
           class="crop-height-slider"
-          v-model="cropRangePercent"
-          range
-          @change="changeSliderRange"
-          :min="sliderRange.min"
-          :max="sliderRange.max"
-          :marks="{
-            10: '10%',
-            20: '20%',
-            50: '50%',
-            80: '80%',
-            90: '90%'
-          }"
+          v-model="cropHeightPercent"
+          :min="0"
+          :max="100"
         />
       </div>
       <div class="btn-box">
@@ -388,28 +331,10 @@ $upload-img-height: 135px;
     }
   }
 }
-.crop-height-slider-lable {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  .el-checkbox {
-    transition: all 0.5s;
-    :deep() {
-      :not(.is-checked) .el-checkbox__inner {
-        background-color: transparent;
-      }
-    }
-  }
-}
 .crop-height-slider {
-  margin-bottom: 30px;
-  transition: all 0.5s;
   :deep() {
     .el-slider__runway {
       transition: all 0.5s;
-    }
-    .el-slider__marks-text {
-      color: var(--color-text);
     }
   }
 }
