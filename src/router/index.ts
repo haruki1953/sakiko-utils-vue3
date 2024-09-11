@@ -13,6 +13,7 @@ const router = createRouter({
       children: [
         {
           path: '',
+          name: 'home',
           component: HomePage,
           meta: { title: `` }
         }
