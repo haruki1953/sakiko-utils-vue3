@@ -40,3 +40,12 @@ export const contactInfo: LinkInfo = {
     link: 'https://github.com/haruki1953'
   }
 }
+
+// 广告
+import adImage from '@/assets/moeu-ad-img.jpg'
+export const adConfig = {
+  image: adImage,
+  link: 'https://moeu01.com/sakiko',
+  code: 'AGMwNnEN',
+  name: '萌物云moeu'
+}

@@ -3,44 +3,49 @@ import { ref, computed } from 'vue'
 import type { UploadFile, UploadUserFile } from 'element-plus'
 import { Plus, Back, Right, Delete } from '@element-plus/icons-vue'
 
-interface ImageData {
-  url: string
-  height: number
-  width: number
-}
-
 const upFiles = ref<UploadUserFile[]>([])
 const mergedImage = ref<string | null>(null)
-const cropHeightPercent = ref<number>(15)
 const isMerging = ref(false)
+const cropRangePercent = ref<[number, number]>([0, 15])
+const sliderRange = ref({ min: 0, max: 30 })
+const dontCropFirstSub = ref(false)
 
-const handlePicFile = (file: File): Promise<ImageData> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        resolve({
-          url: e.target?.result as string,
-          height: img.height,
-          width: img.width
-        })
-      }
-      img.onerror = reject
-      img.src = e.target?.result as string
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+const calcCropRangePercent = () => {
+  const [minValue, maxValue] = cropRangePercent.value
+  return {
+    max: Math.max(minValue, maxValue),
+    min: Math.min(minValue, maxValue),
+    difference: Math.abs(maxValue - minValue)
+  }
+}
+const changeSliderRange = () => {
+  let { min, max } = calcCropRangePercent()
+  if (max >= 30) {
+    max = 100
+  } else {
+    max = 30
+  }
+  if (min <= 70) {
+    min = 0
+  } else {
+    min = 70
+  }
+  sliderRange.value = { min, max }
 }
 
-const handleFiles = async (uploadFiles: UploadUserFile[]) => {
-  const tempImages: ImageData[] = []
-  for (const file of uploadFiles) {
-    const imageData = await handlePicFile(file.raw as File)
-    tempImages.push(imageData)
-  }
-  return tempImages
+const handlePicFiles = async (
+  uploadFiles: UploadUserFile[]
+): Promise<HTMLImageElement[]> => {
+  return Promise.all(
+    uploadFiles.map((file) => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = reject
+        img.src = URL.createObjectURL(file.raw as File)
+      })
+    })
+  )
 }
 
 const mergeImages = async () => {
@@ -50,49 +55,58 @@ const mergeImages = async () => {
   }
   isMerging.value = true
   try {
-    const imageList = await handleFiles(upFiles.value)
+    const imageList = await handlePicFiles(upFiles.value)
+    const baseImage = imageList[0]
 
-    const baseImage = new Image()
-    baseImage.src = imageList[0].url
-    await new Promise((resolve) => {
-      baseImage.onload = resolve
-    })
+    // 字幕拼接高度
+    const cropHeight =
+      baseImage.height * (calcCropRangePercent().difference / 100)
+    // 字幕上边
+    const cropMax = baseImage.height * (calcCropRangePercent().max / 100)
+    // 字幕下边
+    const cropMin = baseImage.height * (calcCropRangePercent().min / 100)
 
-    const cropHeight = baseImage.height * (cropHeightPercent.value / 100)
+    const startHeight =
+      baseImage.height - (dontCropFirstSub.value ? cropMax : cropMin)
+
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d') as CanvasRenderingContext2D
 
     // Set canvas width to the width of the first image
     canvas.width = baseImage.width
     // Set canvas height to the height of the first image plus the cropped heights of all subsequent images
-    canvas.height = baseImage.height + cropHeight * (imageList.length - 1)
+    canvas.height = startHeight + cropHeight * (imageList.length - 1)
 
-    // Draw the first image in its entirety
-    context.drawImage(baseImage, 0, 0)
+    // Draw the first image
+    context.drawImage(
+      baseImage,
+      0,
+      0,
+      baseImage.width,
+      startHeight,
+      0,
+      0,
+      baseImage.width,
+      startHeight
+    )
 
     // Draw each subsequent image cropped from the bottom
-    let currentHeight = baseImage.height
-    for (let i = 1; i < imageList.length; i++) {
-      const img = new Image()
-      img.src = imageList[i].url
-      await new Promise((resolve) => {
-        img.onload = resolve
-      })
+    let currentHeight = startHeight
 
-      // Draw the cropped part of each image at the current height
+    imageList.slice(1).forEach((img) => {
       context.drawImage(
         img,
         0,
-        img.height - cropHeight,
+        img.height - cropMax - 1,
         img.width,
-        cropHeight,
+        cropHeight + 1,
         0,
-        currentHeight,
+        currentHeight - 1,
         img.width,
-        cropHeight
+        cropHeight + 1
       )
       currentHeight += cropHeight
-    }
+    })
 
     // Convert the canvas content to a data URL and store it in mergedImage
     mergedImage.value = canvas.toDataURL('image/png')
@@ -120,7 +134,7 @@ const copyImage = async () => {
     await navigator.clipboard.write([clipboardItem])
     messageSuccess('复制成功')
   } catch (err) {
-    messageError('复制失败')
+    messageError('复制失败，请尝试手动复制')
   }
 }
 
@@ -211,8 +225,8 @@ const handleFileRemove = (file: UploadFile) => {
 </script>
 
 <template>
-  <div class="utils-page">
-    <h2>字幕拼接小工具🎬</h2>
+  <div class="subtitle-cut-util">
+    <h2>图片字幕拼接🎬</h2>
     <div>
       <div class="upload">
         <el-upload
@@ -221,6 +235,7 @@ const handleFileRemove = (file: UploadFile) => {
           accept="image/*"
           v-model:file-list="upFiles"
           list-type="picture-card"
+          drag
         >
           <el-icon class="uploader-icon"><Plus /></el-icon>
           <span class="uploader-text">添加图片</span>
@@ -258,12 +273,24 @@ const handleFileRemove = (file: UploadFile) => {
         </el-upload>
       </div>
       <div>
-        <el-text tag="b" size="large"> 字幕截取高度（百分比） </el-text>
+        <div class="crop-height-slider-lable">
+          <span> 字幕截取高度 </span>
+          <el-checkbox v-model="dontCropFirstSub" label="不拼接首个字幕" />
+        </div>
         <el-slider
           class="crop-height-slider"
-          v-model="cropHeightPercent"
-          :min="0"
-          :max="100"
+          v-model="cropRangePercent"
+          range
+          @change="changeSliderRange"
+          :min="sliderRange.min"
+          :max="sliderRange.max"
+          :marks="{
+            10: '10%',
+            20: '20%',
+            50: '50%',
+            80: '80%',
+            90: '90%'
+          }"
         />
       </div>
       <div class="btn-box">
@@ -292,9 +319,7 @@ const handleFileRemove = (file: UploadFile) => {
 </template>
 
 <style lang="scss" scoped>
-.utils-page {
-  max-width: 1030px;
-  margin: 0 auto;
+.subtitle-cut-util {
   font-family: Arial, sans-serif;
   line-height: 1.6;
   font-size: 16px;
@@ -306,8 +331,7 @@ const handleFileRemove = (file: UploadFile) => {
     text-align: center;
   }
 }
-$upload-img-width: 240px;
-$upload-img-max-width: 300px;
+$upload-img-width: 300px;
 $upload-img-height: 135px;
 .upload {
   :deep() {
@@ -318,9 +342,11 @@ $upload-img-height: 135px;
       align-content: center;
       .el-upload-list__item {
         width: auto;
-        max-width: $upload-img-max-width;
+        max-width: $upload-img-width;
+        min-width: $upload-img-height;
         height: $upload-img-height;
         display: flex;
+        justify-content: center;
         margin: 8px;
         background-color: var(--color-background);
         transition: all 0.5s;
@@ -341,6 +367,7 @@ $upload-img-height: 135px;
       cursor: pointer;
       position: relative;
       overflow: hidden;
+      background-color: transparent;
       transition:
         border var(--el-transition-duration),
         background-color 0.5s;
@@ -355,16 +382,47 @@ $upload-img-height: 135px;
         font-weight: bold;
         margin-left: 10px;
       }
+      .el-upload-dragger {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        // visibility: hidden;
+        border: none;
+        background-color: transparent;
+        &.is-dragover {
+          background-color: var(--el-color-primary-light-9);
+        }
+      }
     }
     .el-upload-list__item-thumbnail {
       background-color: var(--el-fill-color-blank);
     }
   }
 }
+.crop-height-slider-lable {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  .el-checkbox {
+    transition: all 0.5s;
+    :deep() {
+      :not(.is-checked) .el-checkbox__inner {
+        background-color: transparent;
+      }
+    }
+  }
+}
 .crop-height-slider {
+  margin-bottom: 30px;
+  transition: all 0.5s;
   :deep() {
     .el-slider__runway {
       transition: all 0.5s;
+    }
+    .el-slider__marks-text {
+      color: var(--color-text);
     }
   }
 }

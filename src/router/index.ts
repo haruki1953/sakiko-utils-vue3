@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import LayoutContainer from '@/views/layout/LayoutContainer.vue'
 import HomePage from '@/views/home/HomePage.vue'
+import UtilsPage from '@/views/utils/UtilsPage.vue'
 import { webName } from '@/config'
 import { ref } from 'vue'
 
@@ -16,6 +17,12 @@ const router = createRouter({
           name: 'home',
           component: HomePage,
           meta: { title: `` }
+        },
+        {
+          path: '/utils',
+          name: 'utils',
+          component: UtilsPage,
+          meta: { title: `小工具` }
         }
       ]
     }

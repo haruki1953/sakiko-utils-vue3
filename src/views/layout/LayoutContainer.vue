@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import MenuBar from './components/MenuBar.vue'
+import FooterBar from './components/FooterBar.vue'
 import { HomeFilled } from '@element-plus/icons-vue'
+import { useElementSize } from '@vueuse/core'
+
+const refFooterBarBox = ref<HTMLElement | null>(null)
+const footerBarBoxSize = useElementSize(refFooterBarBox)
 
 onMounted(async () => {
   //
@@ -16,12 +21,23 @@ onMounted(async () => {
         index: '/',
         title: '首页',
         icon: HomeFilled
+      },
+      {
+        index: '/utils',
+        title: '小工具',
+        icon: HomeFilled
       }
     ]"
   ></MenuBar>
 
-  <div class="container">
+  <div
+    class="container"
+    :style="{ paddingBottom: `${footerBarBoxSize.height.value}px` }"
+  >
     <router-view></router-view>
+    <div class="footer-bar-box" ref="refFooterBarBox">
+      <FooterBar class="footer-bar"></FooterBar>
+    </div>
   </div>
 </template>
 
@@ -47,6 +63,17 @@ $ref-padding-top: 60px;
   padding: $ref-padding-top 20px 0 20px;
   margin: 0 auto;
   max-width: 1920px;
+  min-height: 100vh;
+  position: relative;
+  .footer-bar-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    .footer-bar {
+      margin: 20px;
+    }
+  }
 }
 @media (min-width: 1200px) {
   .container {
