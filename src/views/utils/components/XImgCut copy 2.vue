@@ -11,14 +11,6 @@ import type { UploadFile, UploadUserFile } from 'element-plus'
 import { ref } from 'vue'
 import { computed } from 'vue'
 import { nextTick } from 'vue'
-import {
-  imageCropToRatioService,
-  imageLoadImageFromFileService,
-  imageMergeVerticalService,
-  imageResizeImageService,
-  imageScaleImageService,
-  imageSplitInFourService
-} from '../services'
 
 const xImgCutDemonstrateGroup = [
   xImgCutDemonstrateLT,
@@ -112,8 +104,6 @@ const saveAllImage = () => {
   saveImage(mergedImageRB.value, 'RightBottom')
 }
 
-const tempTestList = ref<string[]>([])
-
 const mergeImage = async () => {
   if (!mainImageFile.value) {
     return
@@ -127,33 +117,232 @@ const mergeImage = async () => {
   })
   await nextTick()
 
-  const mainImageEl = await imageLoadImageFromFileService(mainImageFile.value)
+  const imageEl = await loadImageFromFile(mainImageFile.value)
 
-  // 1 将主图裁剪为16:9
-  const mainImageCutTo169 = imageCropToRatioService(mainImageEl, 16, 9)
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d', {
+    willReadFrequently: true
+  }) as CanvasRenderingContext2D
 
-  // 2 将主图放大2倍
-  const mainImageEnlarge2 = imageScaleImageService(mainImageCutTo169, 2)
+  // 获取主图的原始尺寸
+  const originalWidth = imageEl.width
+  const originalHeight = imageEl.height
 
-  // 3 将图片分为四份
-  const mainImageAfterSplitInFour = imageSplitInFourService(mainImageEnlarge2)
+  // 计算裁剪的 16:9 区域
+  const targetAspectRatio = 16 / 9
+  let cropWidth = originalWidth
+  let cropHeight = originalHeight
 
-  // 4 拼接
-  const mergedLT = await mergeImageListToMain(
-    ltImageFiles.value,
-    mainImageAfterSplitInFour.leftTop
+  if (originalWidth / originalHeight > targetAspectRatio) {
+    cropWidth = originalHeight * targetAspectRatio
+  } else {
+    cropHeight = originalWidth / targetAspectRatio
+  }
+
+  const cropX = (originalWidth - cropWidth) / 2
+  const cropY = (originalHeight - cropHeight) / 2
+
+  canvas.width = cropWidth
+  canvas.height = cropHeight
+
+  // 裁剪主图并绘制到 canvas
+  context.drawImage(
+    imageEl,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    cropWidth,
+    cropHeight
   )
-  const mergedRT = await mergeImageListToMain(
-    rtImageFiles.value,
-    mainImageAfterSplitInFour.rightTop
+
+  // 放大图片两倍
+  const scaledCanvas = document.createElement('canvas')
+  scaledCanvas.width = cropWidth * 2
+  scaledCanvas.height = cropHeight * 2
+  const scaledContext = scaledCanvas.getContext(
+    '2d'
+  ) as CanvasRenderingContext2D
+
+  scaledContext.scale(2, 2)
+  scaledContext.drawImage(canvas, 0, 0)
+
+  const halfWidth = scaledCanvas.width / 2
+  const halfHeight = scaledCanvas.height / 2
+
+  // 创建切片 canvas
+  const partLTCanvas = document.createElement('canvas')
+  const partRTCanvas = document.createElement('canvas')
+  const partLBCanvas = document.createElement('canvas')
+  const partRBCanvas = document.createElement('canvas')
+
+  partLTCanvas.width =
+    partRTCanvas.width =
+    partLBCanvas.width =
+    partRBCanvas.width =
+      halfWidth
+  partLTCanvas.height =
+    partRTCanvas.height =
+    partLBCanvas.height =
+    partRBCanvas.height =
+      halfHeight
+
+  const partLTContext = partLTCanvas.getContext('2d', {
+    willReadFrequently: true
+  }) as CanvasRenderingContext2D
+  const partRTContext = partRTCanvas.getContext('2d', {
+    willReadFrequently: true
+  }) as CanvasRenderingContext2D
+  const partLBContext = partLBCanvas.getContext('2d', {
+    willReadFrequently: true
+  }) as CanvasRenderingContext2D
+  const partRBContext = partRBCanvas.getContext('2d', {
+    willReadFrequently: true
+  }) as CanvasRenderingContext2D
+
+  partLTContext.drawImage(
+    scaledCanvas,
+    0,
+    0,
+    halfWidth,
+    halfHeight,
+    0,
+    0,
+    halfWidth,
+    halfHeight
   )
-  const mergedLB = await mergeImageListToMain(
-    lbImageFiles.value,
-    mainImageAfterSplitInFour.leftBottom
+  partRTContext.drawImage(
+    scaledCanvas,
+    halfWidth,
+    0,
+    halfWidth,
+    halfHeight,
+    0,
+    0,
+    halfWidth,
+    halfHeight
   )
-  const mergedRB = await mergeImageListToMain(
-    rbImageFiles.value,
-    mainImageAfterSplitInFour.rightBottom
+  partLBContext.drawImage(
+    scaledCanvas,
+    0,
+    halfHeight,
+    halfWidth,
+    halfHeight,
+    0,
+    0,
+    halfWidth,
+    halfHeight
+  )
+  partRBContext.drawImage(
+    scaledCanvas,
+    halfWidth,
+    halfHeight,
+    halfWidth,
+    halfHeight,
+    0,
+    0,
+    halfWidth,
+    halfHeight
+  )
+
+  // 辅助函数：裁剪并缩放数组中的图片
+  const cropAndScaleImage = async (
+    file: UploadFile,
+    width: number,
+    height: number
+  ): Promise<HTMLCanvasElement> => {
+    const img = await loadImageFromFile(file)
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = width
+    tempCanvas.height = height
+    const tempContext = tempCanvas.getContext('2d') as CanvasRenderingContext2D
+
+    // 裁剪为 16:9 并缩放
+    const aspectRatio = img.width / img.height
+    let sx = 0,
+      sy = 0,
+      sWidth = img.width,
+      sHeight = img.height
+    if (aspectRatio > targetAspectRatio) {
+      sWidth = img.height * targetAspectRatio
+      sx = (img.width - sWidth) / 2
+    } else {
+      sHeight = img.width / targetAspectRatio
+      sy = (img.height - sHeight) / 2
+    }
+
+    tempContext.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height)
+    return tempCanvas
+  }
+
+  // 辅助函数：拼接主图切片与数组中的图片
+  const mergeWithArray = async (
+    partCanvas: HTMLCanvasElement,
+    imagesArray: UploadFile[],
+    width: number,
+    height: number
+  ): Promise<HTMLCanvasElement> => {
+    const mergedCanvas = document.createElement('canvas')
+    mergedCanvas.width = width
+    mergedCanvas.height = height * 3 // 原主切部分+两个拼接部分的高度
+    const mergedContext = mergedCanvas.getContext(
+      '2d'
+    ) as CanvasRenderingContext2D
+
+    if (imagesArray.length > 0) {
+      // 第一个图片在上方
+      const topImageCanvas = await cropAndScaleImage(
+        imagesArray[0],
+        width,
+        height
+      )
+      mergedContext.drawImage(topImageCanvas, 0, 0)
+
+      // 主切部分在中间
+      mergedContext.drawImage(partCanvas, 0, height)
+
+      // 第二个图片在下方（如果有）
+      const bottomImageCanvas = await cropAndScaleImage(
+        imagesArray[1] || imagesArray[0],
+        width,
+        height
+      )
+      mergedContext.drawImage(bottomImageCanvas, 0, height * 2)
+    } else {
+      // 没有图片，保持主切部分原样
+      mergedCanvas.height = height
+      mergedContext.drawImage(partCanvas, 0, 0)
+    }
+
+    return mergedCanvas
+  }
+
+  // 拼接图片
+  const mergedLT = await mergeWithArray(
+    partLTCanvas,
+    ltImageFiles.value as UploadFile[],
+    halfWidth,
+    halfHeight
+  )
+  const mergedRT = await mergeWithArray(
+    partRTCanvas,
+    rtImageFiles.value as UploadFile[],
+    halfWidth,
+    halfHeight
+  )
+  const mergedLB = await mergeWithArray(
+    partLBCanvas,
+    lbImageFiles.value as UploadFile[],
+    halfWidth,
+    halfHeight
+  )
+  const mergedRB = await mergeWithArray(
+    partRBCanvas,
+    rbImageFiles.value as UploadFile[],
+    halfWidth,
+    halfHeight
   )
 
   // 保存最终图片
@@ -171,47 +360,29 @@ const mergeImage = async () => {
   isMerging.value = false
 }
 
-// 将对应数组中的图片，和切割后的主图拼接
-const mergeImageListToMain = async (
-  fileList: UploadUserFile[],
-  partOfMainCanvas: HTMLCanvasElement
-) => {
-  // 图片处理函数
-  const processTheImageFileInList = async (file: UploadUserFile) => {
-    const imgEl = await imageLoadImageFromFileService(file)
-    // 1 将所有图片按“cover”方式裁剪为16比9
-    const imgCutTo169 = imageCropToRatioService(imgEl, 16, 9)
-    // 2 将所有图片进行缩放，大小就为主图切割后一份的大小
-    const imgResizeToMain = imageResizeImageService(
-      imgCutTo169,
-      partOfMainCanvas.width,
-      partOfMainCanvas.width * (9 / 16)
-    )
-    return imgResizeToMain
-  }
-
-  if (fileList.length >= 2) {
-    // 数组中的第一个图片拼接在 主图切割后（以下简称主切）的上方，第二个图片拼接在主切下方
-    const image1InList = await processTheImageFileInList(fileList[0])
-    const image2InList = await processTheImageFileInList(fileList[1])
-    return imageMergeVerticalService([
-      image1InList,
-      partOfMainCanvas,
-      image2InList
-    ])
-  } else if (fileList.length === 1) {
-    // 如果数组中只有一个图片，则主切的上方和下方都为这个图片
-    const image1InList = await processTheImageFileInList(fileList[0])
-    return imageMergeVerticalService([
-      image1InList,
-      partOfMainCanvas,
-      image1InList
-    ])
-  } else {
-    // fileList.length === 0
-    // 如果数组中没有图片，则不进行拼接，保留主切原本
-    return partOfMainCanvas
-  }
+function loadImageFromFile(uploadFile: UploadFile): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    if (!uploadFile.raw) {
+      reject(new Error('Invalid file'))
+      return
+    }
+    // 使用 URL.createObjectURL 将文件转换为 URL
+    const fileUrl = URL.createObjectURL(uploadFile.raw as File)
+    const img = new Image()
+    // 图片加载成功时处理
+    img.onload = () => {
+      // 释放 URL 对象，防止内存泄漏
+      URL.revokeObjectURL(fileUrl)
+      resolve(img)
+    }
+    // 图片加载错误时处理
+    img.onerror = (err) => {
+      URL.revokeObjectURL(fileUrl)
+      reject(err)
+    }
+    // 设置图片的 src
+    img.src = fileUrl
+  })
 }
 </script>
 <template>
@@ -293,10 +464,6 @@ const mergeImageListToMain = async (
                   :data="xImgCutDemonstrateGroup"
                   backgroundcolor="soft"
                 ></ImageGroup>
-                <!-- <ImageGroup
-                  :data="tempTestList"
-                  backgroundcolor="soft"
-                ></ImageGroup> -->
               </el-badge>
             </div>
           </el-col>
