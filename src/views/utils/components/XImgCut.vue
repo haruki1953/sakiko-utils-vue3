@@ -11,15 +11,17 @@ import {
   Setting
 } from '@element-plus/icons-vue'
 
-import xImgCutDemonstrateLB from '@/assets/x-img-cut-demonstrate/x-img-cut-small-lb.jpg'
-import xImgCutDemonstrateLT from '@/assets/x-img-cut-demonstrate/x-img-cut-small-lt.jpg'
-import xImgCutDemonstrateRB from '@/assets/x-img-cut-demonstrate/x-img-cut-small-rb.jpg'
-import xImgCutDemonstrateRT from '@/assets/x-img-cut-demonstrate/x-img-cut-small-rt.jpg'
-import xImgCutDemonstrate2L from '@/assets/x-img-cut-demonstrate/x-img-cut-2l.jpg'
-import xImgCutDemonstrate2R from '@/assets/x-img-cut-demonstrate/x-img-cut-2r.jpg'
-import xImgCutDemonstrate3L from '@/assets/x-img-cut-demonstrate/x-img-cut-3l.jpg'
-import xImgCutDemonstrate3RB from '@/assets/x-img-cut-demonstrate/x-img-cut-3rb.jpg'
-import xImgCutDemonstrate3RT from '@/assets/x-img-cut-demonstrate/x-img-cut-3rt.jpg'
+import {
+  xImgCutDemoLB,
+  xImgCutDemoLT,
+  xImgCutDemoRB,
+  xImgCutDemoRT,
+  xImgCutDemo2L,
+  xImgCutDemo2R,
+  xImgCutDemo3L,
+  xImgCutDemo3RB,
+  xImgCutDemo3RT
+} from '../assets'
 
 import ImageGroup from './ImageGroup.vue'
 import ImageUploadSelecter from './ImageUploadSelecter.vue'
@@ -39,18 +41,24 @@ import {
 } from '../services'
 import { useWindowSize } from '@vueuse/core'
 
-const xImgCutDemonstrateGroup = [
-  xImgCutDemonstrateLT,
-  xImgCutDemonstrateRT,
-  xImgCutDemonstrateLB,
-  xImgCutDemonstrateRB
+const xImgCutDemoGroup = [
+  xImgCutDemoLT,
+  xImgCutDemoRT,
+  xImgCutDemoLB,
+  xImgCutDemoRB
 ]
-const xImgCut3DemonstrateGroup = [
-  xImgCutDemonstrate3L,
-  xImgCutDemonstrate3RB,
-  xImgCutDemonstrate3RT
-]
-const xImgCut2DemonstrateGroup = [xImgCutDemonstrate2L, xImgCutDemonstrate2R]
+const xImgCut3DemoGroup = [xImgCutDemo3L, xImgCutDemo3RB, xImgCutDemo3RT]
+const xImgCut2DemoGroup = [xImgCutDemo2L, xImgCutDemo2R]
+const xImgCutDemoByMode = computed(() => {
+  if (modeRadio.value === 'four') {
+    return xImgCutDemoGroup
+  } else if (modeRadio.value === 'three') {
+    return xImgCut3DemoGroup
+  } else {
+    // (modeRadio.value === 'two')
+    return xImgCut2DemoGroup
+  }
+})
 
 // 左上、右上、左下、右下
 const ltImageFiles = ref<UploadUserFile[]>([])
@@ -173,80 +181,90 @@ const mergeImage = async () => {
   })
   await nextTick()
 
-  const mainImageEl = await imageLoadImageFromFileService(mainImageFile.value)
+  try {
+    const mainImageEl = await imageLoadImageFromFileService(mainImageFile.value)
 
-  // 1 将主图裁剪为16:9
-  const mainImageCutTo169 = imageCropToRatioService(mainImageEl, 16, 9)
+    // 1 将主图裁剪为16:9
+    const mainImageCutTo169 = imageCropToRatioService(mainImageEl, 16, 9)
 
-  // 2 将主图放大2倍
-  const mainImageEnlarge2 = imageScaleImageService(mainImageCutTo169, 2)
+    // 2 将主图放大2倍
+    const mainImageEnlarge2 = imageScaleImageService(mainImageCutTo169, 2)
 
-  let mergedLT
-  let mergedRT
-  let mergedLB
-  let mergedRB
+    let mergedLT
+    let mergedRT
+    let mergedLB
+    let mergedRB
 
-  // 3 将图片分为指定份数份
-  if (modeRadio.value === 'four') {
-    const mainImageAfterSplitInFour = imageSplitInFourService(mainImageEnlarge2)
-    // 4 拼接
-    mergedLT = await mergeImageListToMain(
-      ltImageFiles.value,
-      mainImageAfterSplitInFour.leftTop
-    )
-    mergedRT = await mergeImageListToMain(
-      rtImageFiles.value,
-      mainImageAfterSplitInFour.rightTop
-    )
-    mergedLB = await mergeImageListToMain(
-      lbImageFiles.value,
-      mainImageAfterSplitInFour.leftBottom
-    )
-    mergedRB = await mergeImageListToMain(
-      rbImageFiles.value,
-      mainImageAfterSplitInFour.rightBottom
-    )
-  } else if (modeRadio.value === 'three') {
-    const mainImageAfterSplit = imageSplitInThreeService(mainImageEnlarge2)
-    // 4 拼接
-    mergedLT = await mergeImageListToMain(
-      ltImageFiles.value,
-      mainImageAfterSplit.left
-    )
-    mergedRT = await mergeImageListToMain(
-      rtImageFiles.value,
-      mainImageAfterSplit.rightTop
-    )
-    mergedRB = await mergeImageListToMain(
-      rbImageFiles.value,
-      mainImageAfterSplit.rightBottom
-    )
-  } else if (modeRadio.value === 'two') {
-    const mainImageAfterSplit = imageSplitInTwoService(mainImageEnlarge2)
-    // 4 拼接
-    mergedLT = await mergeImageListToMain(
-      ltImageFiles.value,
-      mainImageAfterSplit.left
-    )
-    mergedRT = await mergeImageListToMain(
-      rtImageFiles.value,
-      mainImageAfterSplit.right
-    )
+    // 3 将图片分为指定份数份
+    if (modeRadio.value === 'four') {
+      const mainImageAfterSplitInFour =
+        imageSplitInFourService(mainImageEnlarge2)
+      // 4 拼接
+      mergedLT = await mergeImageListToMain(
+        ltImageFiles.value,
+        mainImageAfterSplitInFour.leftTop
+      )
+      mergedRT = await mergeImageListToMain(
+        rtImageFiles.value,
+        mainImageAfterSplitInFour.rightTop
+      )
+      mergedLB = await mergeImageListToMain(
+        lbImageFiles.value,
+        mainImageAfterSplitInFour.leftBottom
+      )
+      mergedRB = await mergeImageListToMain(
+        rbImageFiles.value,
+        mainImageAfterSplitInFour.rightBottom
+      )
+    } else if (modeRadio.value === 'three') {
+      const mainImageAfterSplit = imageSplitInThreeService(mainImageEnlarge2)
+      // 4 拼接
+      mergedLT = await mergeImageListToMain(
+        ltImageFiles.value,
+        mainImageAfterSplit.left
+      )
+      mergedRT = await mergeImageListToMain(
+        rtImageFiles.value,
+        mainImageAfterSplit.rightTop
+      )
+      mergedRB = await mergeImageListToMain(
+        rbImageFiles.value,
+        mainImageAfterSplit.rightBottom
+      )
+    } else if (modeRadio.value === 'two') {
+      const mainImageAfterSplit = imageSplitInTwoService(mainImageEnlarge2)
+      // 4 拼接
+      mergedLT = await mergeImageListToMain(
+        ltImageFiles.value,
+        mainImageAfterSplit.left
+      )
+      mergedRT = await mergeImageListToMain(
+        rtImageFiles.value,
+        mainImageAfterSplit.right
+      )
+    }
+
+    // 保存最终图片
+    mergedImageLT.value = mergedLT?.toDataURL('image/png') || null
+    mergedImageRT.value = mergedRT?.toDataURL('image/png') || null
+    mergedImageLB.value = mergedLB?.toDataURL('image/png') || null
+    mergedImageRB.value = mergedRB?.toDataURL('image/png') || null
+
+    await nextTick()
+    ElMessage({
+      type: 'success',
+      offset: 66,
+      message: '生成成功'
+    })
+  } catch (error) {
+    ElMessage({
+      type: 'error',
+      offset: 66,
+      message: '生成失败'
+    })
+  } finally {
+    isMerging.value = false
   }
-
-  // 保存最终图片
-  mergedImageLT.value = mergedLT?.toDataURL('image/png') || null
-  mergedImageRT.value = mergedRT?.toDataURL('image/png') || null
-  mergedImageLB.value = mergedLB?.toDataURL('image/png') || null
-  mergedImageRB.value = mergedRB?.toDataURL('image/png') || null
-
-  await nextTick()
-  ElMessage({
-    type: 'success',
-    offset: 66,
-    message: '生成成功'
-  })
-  isMerging.value = false
 }
 
 // 将对应数组中的图片，和切割后的主图拼接
@@ -329,7 +347,7 @@ const imageMergeGap = ref(0)
               <div class="demonstrate">
                 <ImageGroup
                   :data="mergedImageGroup"
-                  backgroundcolor="soft"
+                  backgroundColor="soft"
                 ></ImageGroup>
               </div>
             </div>
@@ -496,33 +514,12 @@ const imageMergeGap = ref(0)
                 <Transition name="fade-slide" mode="out-in">
                   <div
                     class="demonstrate transition"
-                    v-if="modeRadio === 'four'"
-                    key="four"
+                    :key="xImgCutDemoByMode.toString()"
                   >
                     <el-badge value="示例" type="primary" :offset="[-35, 15]">
                       <ImageGroup
-                        :data="xImgCutDemonstrateGroup"
-                        backgroundcolor="soft"
-                      ></ImageGroup>
-                    </el-badge>
-                  </div>
-                  <div
-                    class="demonstrate transition"
-                    v-else-if="modeRadio === 'three'"
-                    key="three"
-                  >
-                    <el-badge value="示例" type="primary" :offset="[-35, 15]">
-                      <ImageGroup
-                        :data="xImgCut3DemonstrateGroup"
-                        backgroundcolor="soft"
-                      ></ImageGroup>
-                    </el-badge>
-                  </div>
-                  <div class="demonstrate transition" v-else key="two">
-                    <el-badge value="示例" type="primary" :offset="[-35, 15]">
-                      <ImageGroup
-                        :data="xImgCut2DemonstrateGroup"
-                        backgroundcolor="soft"
+                        :data="xImgCutDemoByMode"
+                        backgroundColor="soft"
                       ></ImageGroup>
                     </el-badge>
                   </div>
@@ -533,7 +530,6 @@ const imageMergeGap = ref(0)
         </el-row>
       </div>
     </div>
-    <el-divider class="utils-divider" />
   </div>
 </template>
 <style lang="scss" scoped>
@@ -683,10 +679,6 @@ $upload-img-height: 135px;
   margin: 10px;
 }
 
-.utils-divider {
-  transition: all 0.5s;
-}
-
 .setting-dialog {
   :deep() {
     .el-dialog {
@@ -704,26 +696,6 @@ $upload-img-height: 135px;
   }
 }
 
-// .input-box {
-//   :deep() {
-//     .el-input {
-//       .el-input__wrapper {
-//         border-radius: 10px;
-//         background-color: var(--color-background-soft);
-//         transition: all 0.5s;
-//         box-shadow: none;
-//         &:hover {
-//           box-shadow: none;
-//         }
-//         .el-input__inner {
-//           // color: var(--color-text);
-//           // font-weight: bold;
-//           // text-align: center;
-//         }
-//       }
-//     }
-//   }
-// }
 .center-box {
   display: flex;
   flex-direction: column;
