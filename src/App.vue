@@ -1,5 +1,5 @@
 <script setup lang="ts">
-ElMessage('HelloWorld')
+// ElMessage('HelloWorld')
 </script>
 
 <template>

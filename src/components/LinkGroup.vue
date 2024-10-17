@@ -7,7 +7,7 @@ const openLink = (url: string) => {
 }
 </script>
 <template>
-  <div>
+  <div class="link-group">
     <el-tooltip
       v-for="(item, key) in contactInfo"
       :key="key"

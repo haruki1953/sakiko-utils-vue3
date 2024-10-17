@@ -21,7 +21,10 @@ const router = createRouter({
     }
   ],
   // 路由滚动行为定制
-  scrollBehavior() {
+  scrollBehavior(to, from, savedPosition) {
+    if (to.path === from.path) {
+      return
+    }
     return {
       top: 0
     }
